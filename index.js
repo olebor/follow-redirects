@@ -474,7 +474,23 @@ RedirectableRequest.prototype._processResponse = function (response) {
       method: method,
       headers: requestHeaders,
     };
-    beforeRedirect(this._options, responseDetails, requestDetails);
+
+    // Check if a promise is returned. Wait for it to resolve before continuing
+    var waitingPromise = beforeRedirect(this._options, responseDetails, requestDetails);
+
+    if (isPromise(waitingPromise)) {
+      var self = this;
+      waitingPromise
+        .then(function () {
+          self._sanitizeOptions(self._options);
+          self._performRequest();
+        })
+        .catch(function (error) {
+          throw error;
+        });
+      return;
+    }
+
     this._sanitizeOptions(this._options);
   }
 
@@ -664,6 +680,11 @@ function isBuffer(value) {
 
 function isURL(value) {
   return URL && value instanceof URL;
+}
+
+function isPromise(value) {
+  return value !== null && typeof value === "object" &&
+    typeof value.then === "function" && typeof value.catch === "function";
 }
 
 // Exports
